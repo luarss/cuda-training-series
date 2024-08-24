@@ -37,15 +37,16 @@ __global__ void mmul(const float *A, const float *B, float *C, int ds) {
     for (int i = 0; i < ds/block_size; i++) {
 
       // Load data into shared memory
-      As[threadIdx.y][threadIdx.x] = A[FIXME];
-      Bs[threadIdx.y][threadIdx.x] = B[FIXME];
+      // Row major: idy * ds + (i * block_size + threadIdx.x)
+      As[threadIdx.y][threadIdx.x] = A[idy*ds + (i*block_size + threadIdx.x)];
+      Bs[threadIdx.y][threadIdx.x] = B[(i*block_size + threadIdx.y)*ds + idx];
 
       // Synchronize
       __syncthreads();
 
       // Keep track of the running sum
       for (int k = 0; k < block_size; k++)
-      	temp += As[FIXME][FIXME] * Bs[FIXME][FIXME]; // dot product of row and column
+      	temp += As[threadIdx.y][k] * Bs[k][threadIdx.x]; // dot product of row and column
       __syncthreads();
 
     }
@@ -112,7 +113,11 @@ int main(){
 
   // Verify results
   cudaCheckErrors("kernel execution failure or cudaMemcpy H2D failure");
-  for (int i = 0; i < DSIZE*DSIZE; i++) if (h_C[i] != A_val*B_val*DSIZE) {printf("mismatch at index %d, was: %f, should be: %f\n", i, h_C[i], A_val*B_val*DSIZE); return -1;}
+  for (int i = 0; i < DSIZE*DSIZE; i++) 
+    if (h_C[i] != A_val*B_val*DSIZE){
+      printf("mismatch at index %d, was: %f, should be: %f\n", i, h_C[i], A_val*B_val*DSIZE);
+      return -1;
+    }
   printf("Success!\n"); 
   return 0;
 }
